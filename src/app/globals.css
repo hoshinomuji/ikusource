@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-ibm-plex-sans-thai), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ═══ สไตล์ของผม: นุ่ม ลึก โทนเดียว ═══ */
+:root {
+  --background: 220 18% 98%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 14% 94%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 220 14% 94%;
+  --muted-foreground: 220 9% 46%;
+
+  --accent: 220 14% 94%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 13% 88%;
+  --input: 220 13% 88%;
+  --ring: 221 83% 53%;
+
+  --radius: 0.75rem;
+  --sidebar-width: 16rem;
+  --header-height: 3.5rem;
+  --card-radius: 1rem;
+  --card-shadow: 0 2px 8px -2px rgb(0 0 0 / 0.06), 0 4px 16px -4px rgb(0 0 0 / 0.04);
+  --card-shadow-hover: 0 12px 32px -8px rgb(0 0 0 / 0.1), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+}
+
+.dark {
+  --background: 224 28% 5%;
+  --foreground: 210 20% 98%;
+
+  --card: 224 24% 9%;
+  --card-foreground: 210 20% 98%;
+
+  --popover: 224 24% 9%;
+  --popover-foreground: 210 20% 98%;
+
+  --primary: 217 91% 60%;
+  --primary-foreground: 224 28% 5%;
+
+  --secondary: 224 20% 14%;
+  --secondary-foreground: 210 20% 98%;
+
+  --muted: 224 20% 14%;
+  --muted-foreground: 215 16% 58%;
+
+  --accent: 224 20% 14%;
+  --accent-foreground: 210 20% 98%;
+
+  --destructive: 0 55% 45%;
+  --destructive-foreground: 210 20% 98%;
+
+  --border: 224 20% 16%;
+  --input: 224 20% 16%;
+  --ring: 217 91% 60%;
+
+  --card-shadow: 0 4px 24px -4px rgb(0 0 0 / 0.35);
+  --card-shadow-hover: 0 16px 40px -8px rgb(0 0 0 / 0.4), 0 0 0 1px hsl(217 91% 60% / 0.08);
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Hide scrollbars globally while keeping scroll functionality */
+html,
+body,
+* {
+  -ms-overflow-style: none; /* IE and old Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* พื้นหลัง dashboard – gradient สวยๆ ไม่มีเส้นขาวดำ */
+.dashboard-main-bg {
+  position: relative;
+  background: linear-gradient(135deg, hsl(220 18% 98%) 0%, hsl(230 25% 96%) 50%, hsl(250 30% 97%) 100%);
+  min-height: 100%;
+}
+.dashboard-main-bg::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(ellipse 80% 50% at 100% 0%, hsl(250 80% 70% / 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 80% at 0% 100%, hsl(200 80% 65% / 0.08) 0%, transparent 50%);
+}
+.dark .dashboard-main-bg {
+  background: linear-gradient(160deg, hsl(224 28% 5%) 0%, hsl(235 30% 8%) 40%, hsl(250 25% 6%) 100%);
+}
+.dark .dashboard-main-bg::before {
+  background: 
+    radial-gradient(ellipse 70% 50% at 100% -20%, hsl(250 90% 65% / 0.15) 0%, transparent 45%),
+    radial-gradient(ellipse 50% 60% at 0% 100%, hsl(210 80% 55% / 0.1) 0%, transparent 45%);
+}
+.dashboard-main-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* การ์ด – เงานุ่ม ไม่ใช้เส้นขอบแข็ง */
+[data-slot="card"] {
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.3s ease, transform 0.25s ease;
+  border: none;
+}
+[data-slot="card"]:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+.dark [data-slot="card"] {
+  background: hsl(var(--card));
+  box-shadow: 0 4px 24px -4px rgb(0 0 0 / 0.3);
+}
+.dark [data-slot="card"]:hover {
+  box-shadow: 0 16px 40px -8px rgb(0 0 0 / 0.35), 0 0 0 1px hsl(217 91% 60% / 0.06);
+}
+
+[data-slot="card"] [data-slot="table-container"] {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: none;
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.03);
+}
+.dark [data-slot="card"] [data-slot="table-container"] {
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.02);
+}
