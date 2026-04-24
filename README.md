@@ -173,12 +173,12 @@ vercel
 - [x] Basic hosting package management
 - [x] Wallet and payment integration
 - [x] Admin dashboard
-- [ ] Email notification system improvements
+- [x] Email notification system
 
 ### Phase 2: Advanced Features 🚧
 - [ ] Multi-tenant architecture
 - [ ] Advanced analytics and reporting
-- [ ] API rate limiting and security enhancements
+- [x] API rate limiting and security enhancements
 - [ ] Plugin system for extensibility
 - [ ] Migration to Elysia backend
 
@@ -190,10 +190,10 @@ vercel
 - [ ] AI-powered support chat
 
 ### Known Issues & TODOs
-- **Database**: Some migration scripts need environment variable validation
-- **Security**: Review and audit all API endpoints for potential vulnerabilities
-- **Performance**: Implement caching for frequently accessed data
-- **Testing**: Add comprehensive test suite (unit, integration, e2e)
+- [x] **Database**: Migration scripts now validate environment variables
+- [x] **Security**: Security audit completed — CSRF bypass, Discord injection, password reset validation, insecure TLS fixed
+- [x] **Performance**: In-memory cache layer added (`src/lib/cache.ts`)
+- [ ] **Testing**: Add comprehensive test suite (unit, integration, e2e)
 
 ## 🤝 Contributing
 
