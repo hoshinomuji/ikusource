@@ -23,20 +23,15 @@ interface ApiCallOptions {
     retries?: number
 }
 
-interface ParsedStatusResult {
-    suspended: boolean | null
-    raw: string
-}
-
 type ParsedKv = Record<string, string[]>
 
 const DEFAULT_TIMEOUT_MS = 30_000
 const DEFAULT_RETRIES = 2
-const allowInsecureTls = process.env.DIRECTADMIN_INSECURE_TLS === "true"
 
+// SECURITY: Always enforce TLS — never allow MITM attacks
 const customAgent = new Agent({
     connect: {
-        rejectUnauthorized: !allowInsecureTls,
+        rejectUnauthorized: true,
         timeout: 60_000,
     },
 })
@@ -74,10 +69,10 @@ function normalizeBaseUrl(panelUrl: string): string {
 }
 
 function parseDaResponse(responseText: string) {
-    const errorMatch = responseText.match(/(?:^|[&\n])error=([^&\n]+)/i)
-    const textMatch = responseText.match(/(?:^|[&\n])text=([^&\n]+)/i)
-    const detailsMatch = responseText.match(/(?:^|[&\n])details=([^&\n]+)/i)
-    const successMatch = responseText.match(/(?:^|[&\n])success=([^&\n]+)/i)
+    const errorMatch = responseText.match(/(?:^|[\n&])error=([^&\n]+)/i)
+    const textMatch = responseText.match(/(?:^|[\n&])text=([^&\n]+)/i)
+    const detailsMatch = responseText.match(/(?:^|[\n&])details=([^&\n]+)/i)
+    const successMatch = responseText.match(/(?:^|[\n&])success=([^&\n]+)/i)
 
     const errorValue = safeDecode(errorMatch?.[1] || null)
     const text = safeDecode(textMatch?.[1] || null)
@@ -125,7 +120,6 @@ function parsePackageNamesFromBody(responseText: string): string[] {
 
     const names: string[] = []
 
-    // 1) Handle JSON payloads returned by newer/alternative DirectAdmin setups.
     try {
         const parsedJson = JSON.parse(responseText)
         const jsonNames: string[] = []
@@ -142,14 +136,7 @@ function parsePackageNamesFromBody(responseText: string): string[] {
             if (!value || typeof value !== "object") return
 
             const obj = value as Record<string, unknown>
-            const candidateKeys = [
-                "list",
-                "list[]",
-                "packages",
-                "package",
-                "data",
-                "result",
-            ]
+            const candidateKeys = ["list", "list[]", "packages", "package", "data", "result"]
             for (const key of candidateKeys) {
                 if (obj[key] !== undefined) collect(obj[key])
             }
@@ -166,7 +153,6 @@ function parsePackageNamesFromBody(responseText: string): string[] {
         // Not JSON, continue with classic key/value parsing.
     }
 
-    // 2) Handle classic DirectAdmin key/value format.
     const parsedKv = parseDaKeyValueBody(responseText)
     pushUnique(names, [
         ...(parsedKv["list[]"] || []),
@@ -178,7 +164,6 @@ function parsePackageNamesFromBody(responseText: string): string[] {
             .flatMap(([, values]) => values),
     ])
 
-    // 3) Fallback for plain text line/comma separated responses.
     if (names.length === 0 && !responseText.includes("=")) {
         const plain = responseText
             .replace(/\r/g, "\n")
@@ -320,75 +305,99 @@ export class DirectAdminClient {
         form.set("passwd2", params.password)
         form.set("domain", params.domain)
         form.set("package", params.packageName)
-        form.set("ip", params.ip || this.config.serverIp)
-        form.set("notify", params.notify ? "yes" : "no")
+        form.set("ip", params.ip || "auto")
 
-        const result = await this.callApi("/CMD_API_ACCOUNT_USER", form, {
-            retries: 2,
-            timeoutMs: 60_000,
-        })
+        const result = await this.callApi("/CMD_API_ACCOUNT_USER", form)
 
         if (result.error) {
             return { success: false, message: result.error }
         }
 
         const parsed = parseDaResponse(result.body)
+
         if (parsed.hasExplicitError) {
-            const details = [parsed.text, parsed.details].filter(Boolean).join(" ").trim()
             return {
                 success: false,
-                message: details || `DirectAdmin error code: ${parsed.errorValue}`,
+                message: parsed.text || parsed.details || `DirectAdmin error: ${parsed.errorValue}`,
             }
         }
 
-        const looksSuccessful =
-            result.ok ||
-            parsed.errorValue === "0" ||
-            /created|success|domain created/i.test(result.body)
-
-        if (!looksSuccessful) {
-            return {
-                success: false,
-                message: `DirectAdmin rejected account creation (status ${result.status ?? "unknown"})`,
-            }
+        if (params.notify) {
+            const notifyForm = new URLSearchParams()
+            notifyForm.set("user", params.username)
+            notifyForm.set("action", "notify")
+            notifyForm.set("type", "create")
+            await this.callApi("/CMD_API_EMAIL_MANAGE", notifyForm).catch(() => {
+                // Non-critical
+            })
         }
 
         return {
             success: true,
-            message: "Hosting account created successfully",
-            data: {
-                username: params.username,
-                domain: params.domain,
-                email: params.email,
-            },
+            message: "Account created successfully",
+            data: { username: params.username, domain: params.domain },
         }
     }
 
     async suspendAccount(username: string): Promise<{ success: boolean; message: string }> {
         const form = new URLSearchParams()
-        form.set("location", "CMD_SELECT_USERS")
-        form.set("suspend", "Suspend")
-        form.set("select0", username)
+        form.set("action", "suspend")
+        form.set("user", username)
 
-        return this.handleSimpleMutation("/CMD_API_SELECT_USERS", form, "Account suspended successfully")
+        const result = await this.callApi("/CMD_API_MODIFY_USER", form)
+
+        if (result.error) {
+            return { success: false, message: result.error }
+        }
+
+        const parsed = parseDaResponse(result.body)
+
+        if (parsed.hasExplicitError) {
+            return { success: false, message: parsed.text || parsed.details || "Suspend failed" }
+        }
+
+        return { success: true, message: "Account suspended" }
     }
 
     async unsuspendAccount(username: string): Promise<{ success: boolean; message: string }> {
         const form = new URLSearchParams()
-        form.set("location", "CMD_SELECT_USERS")
-        form.set("suspend", "Unsuspend")
-        form.set("select0", username)
+        form.set("action", "unsuspend")
+        form.set("user", username)
 
-        return this.handleSimpleMutation("/CMD_API_SELECT_USERS", form, "Account unsuspended successfully")
+        const result = await this.callApi("/CMD_API_MODIFY_USER", form)
+
+        if (result.error) {
+            return { success: false, message: result.error }
+        }
+
+        const parsed = parseDaResponse(result.body)
+
+        if (parsed.hasExplicitError) {
+            return { success: false, message: parsed.text || parsed.details || "Unsuspend failed" }
+        }
+
+        return { success: true, message: "Account unsuspended" }
     }
 
     async deleteAccount(username: string): Promise<{ success: boolean; message: string }> {
         const form = new URLSearchParams()
-        form.set("action", "delete")
+        form.set("delete", "yes")
         form.set("select0", username)
-        form.set("confirmed", "Confirm")
+        form.set("confirmed", "confirm")
 
-        return this.handleSimpleMutation("/CMD_API_SELECT_USERS", form, "Account deleted successfully")
+        const result = await this.callApi("/CMD_API_SELECT_USERS", form)
+
+        if (result.error) {
+            return { success: false, message: result.error }
+        }
+
+        const parsed = parseDaResponse(result.body)
+
+        if (parsed.hasExplicitError) {
+            return { success: false, message: parsed.text || parsed.details || "Delete failed" }
+        }
+
+        return { success: true, message: "Account deleted" }
     }
 
     async changePassword(username: string, newPassword: string): Promise<{ success: boolean; message: string }> {
@@ -398,64 +407,26 @@ export class DirectAdminClient {
         form.set("passwd", newPassword)
         form.set("passwd2", newPassword)
 
-        return this.handleSimpleMutation("/CMD_API_MODIFY_USER", form, "Password changed successfully")
-    }
-
-    async changePackage(username: string, newPackageName: string): Promise<{ success: boolean; message: string }> {
-        const form = new URLSearchParams()
-        form.set("action", "package")
-        form.set("user", username)
-        form.set("package", newPackageName)
-
-        return this.handleSimpleMutation("/CMD_API_MODIFY_USER", form, "Package changed successfully")
-    }
-
-    async getUserStatus(username: string): Promise<{ success: boolean; message: string; data?: ParsedStatusResult }> {
-        const form = new URLSearchParams()
-        form.set("user", username)
-        const result = await this.callApi("/CMD_API_SHOW_USER_CONFIG", form, {
-            retries: 2,
-            timeoutMs: 20_000,
-        })
+        const result = await this.callApi("/CMD_API_MODIFY_USER", form)
 
         if (result.error) {
             return { success: false, message: result.error }
         }
 
-        if (!result.ok && !/error=0/i.test(result.body)) {
-            return {
-                success: false,
-                message: `DirectAdmin returned HTTP ${result.status ?? "unknown"}`,
-            }
+        const parsed = parseDaResponse(result.body)
+
+        if (parsed.hasExplicitError) {
+            return { success: false, message: parsed.text || parsed.details || "Password change failed" }
         }
 
-        const bodyLower = result.body.toLowerCase()
-        let suspended: boolean | null = null
-        if (bodyLower.includes("suspended=yes") || bodyLower.includes("suspend=yes")) suspended = true
-        if (bodyLower.includes("suspended=no") || bodyLower.includes("suspend=no")) suspended = false
-
-        return {
-            success: true,
-            message: "Fetched user status",
-            data: { suspended, raw: result.body },
-        }
+        return { success: true, message: "Password changed successfully" }
     }
 
-    async getUserUsage(username: string): Promise<{
-        success: boolean
-        message: string
-        data?: {
-            diskUsedMb?: number
-            bandwidthUsedMb?: number
-            domainsUsed?: number
-            raw: string
-        }
-    }> {
+    async getUserUsage(username: string): Promise<{ success: boolean; message: string; data?: any }> {
         const form = new URLSearchParams()
         form.set("user", username)
 
         const result = await this.callApi("/CMD_API_SHOW_USER_USAGE", form, {
-            retries: 2,
             timeoutMs: 20_000,
         })
 
@@ -463,11 +434,8 @@ export class DirectAdminClient {
             return { success: false, message: result.error }
         }
 
-        if (!result.ok && !/error=0/i.test(result.body)) {
-            return {
-                success: false,
-                message: `DirectAdmin returned HTTP ${result.status ?? "unknown"}`,
-            }
+        if (!result.ok) {
+            return { success: false, message: `HTTP ${result.status ?? "unknown"}` }
         }
 
         const toNumber = (value: string | undefined) => {
@@ -587,7 +555,6 @@ export class DirectAdminClient {
         form.set("user", username)
 
         const result = await this.callApi("/CMD_API_SHOW_USER_CONFIG", form, {
-            retries: 2,
             timeoutMs: 20_000,
         })
 
@@ -595,148 +562,84 @@ export class DirectAdminClient {
             return { success: false, message: result.error }
         }
 
-        if (!result.ok && !/error=0/i.test(result.body)) {
-            return {
-                success: false,
-                message: `DirectAdmin returned HTTP ${result.status ?? "unknown"}`,
-            }
+        if (!result.ok) {
+            return { success: false, message: `HTTP ${result.status ?? "unknown"}` }
         }
 
-        const parsed = parseDaKeyValueBody(result.body)
-        const suspendedRaw = (parsed.suspended?.[0] || parsed.suspend?.[0] || "").toLowerCase()
-        const suspended = suspendedRaw === "yes" ? true : suspendedRaw === "no" ? false : null
+        const readKey = (key: string) => {
+            const m = result.body.match(new RegExp(`(?:^|[&\\n])${key}=([^&\\n]+)`, "i"))
+            return safeDecode(m?.[1] || null)
+        }
+
+        const parseBool = (v: string | null) => {
+            if (v === null) return null
+            return v === "1" || v.toLowerCase() === "yes" || v.toLowerCase() === "true"
+        }
 
         return {
             success: true,
             message: "Fetched user config",
             data: {
-                username,
-                domain: parsed.domain?.[0] || "",
-                email: parsed.email?.[0] || "",
-                suspended,
-                packageName: parsed.package?.[0] || "",
+                username: readKey("username") || username,
+                domain: readKey("domain") || "",
+                email: readKey("email") || "",
+                suspended: parseBool(readKey("suspended")),
+                packageName: readKey("package") || "",
                 raw: result.body,
             },
         }
     }
 
-    async createLoginUrl(username: string, expiresMinutes: number = 5): Promise<{ success: boolean; message: string; url?: string; loginData?: { url: string; method: "GET" | "POST"; username?: string; password?: string } }> {
-        // Try login key approach first (one-time key via reseller)
-        try {
-            const form = new URLSearchParams()
-            form.set("action", "create")
-            form.set("keyname", `autologin_${username}_${Date.now()}`)
-            form.set("type", "one_time")
-            form.set("expire", String(expiresMinutes))
-            form.set("allow_http", "1")
-            form.set("creator", "reseller")
-            form.set("user", username)
-            form.set("select0", "CMD_LOGIN")
+    async getUserDomains(username: string): Promise<{ success: boolean; message: string; data?: string[] }> {
+        const form = new URLSearchParams()
+        form.set("action", "list")
+        form.set("user", username)
 
-            const result = await this.callApi("/CMD_API_LOGIN_KEYS", form, {
-                retries: 1,
-                timeoutMs: 15_000,
-            })
-
-            if (!result.error) {
-                const parsed = parseDaResponse(result.body)
-                if (!parsed.hasExplicitError) {
-                    const keyMatch = result.body.match(/(?:^|[&\n])key=([^&\n]+)/i)
-                    const key = safeDecode(keyMatch?.[1] || null)
-                    if (key) {
-                        return {
-                            success: true,
-                            message: "Login URL generated",
-                            url: `${this.baseUrl}/CMD_LOGIN`,
-                            loginData: {
-                                url: `${this.baseUrl}/CMD_LOGIN`,
-                                method: "POST",
-                                username: username,
-                                password: key,
-                            }
-                        }
-                    }
-                }
-            }
-        } catch {
-            // fall through to session login
-        }
-
-        // Fallback: reseller impersonation via CMD_CHANGE_USER_SESSION
-        try {
-            const form2 = new URLSearchParams()
-            form2.set("user", username)
-            const result2 = await this.callApi("/CMD_CHANGE_USER_SESSION", form2, {
-                retries: 1,
-                timeoutMs: 15_000,
-            })
-            if (!result2.error) {
-                const parsed2 = parseDaResponse(result2.body)
-                if (!parsed2.hasExplicitError) {
-                    const sessionKey = result2.body.match(/session=([^&\n]+)/i)
-                    if (sessionKey?.[1]) {
-                        return {
-                            success: true,
-                            message: "Session login URL generated",
-                            url: `${this.baseUrl}/CMD_LOGIN`,
-                            loginData: {
-                                url: `${this.baseUrl}/CMD_LOGIN`,
-                                method: "POST",
-                                username: username,
-                                password: safeDecode(sessionKey[1]) || sessionKey[1],
-                            }
-                        }
-                    }
-                    // If no session key but no error, just open panel
-                    return {
-                        success: true,
-                        message: "Open panel",
-                        url: `${this.baseUrl}/CMD_LOGIN`,
-                        loginData: {
-                            url: `${this.baseUrl}/CMD_LOGIN`,
-                            method: "GET"
-                        }
-                    }
-                }
-            }
-        } catch {
-            // all methods failed
-        }
-
-        return { success: false, message: "Unable to generate DirectAdmin login URL. Please login manually." }
-    }
-
-    private async handleSimpleMutation(
-        path: string,
-        formData: URLSearchParams,
-        successMessage: string
-    ): Promise<{ success: boolean; message: string }> {
-        const result = await this.callApi(path, formData, {
-            retries: 2,
-            timeoutMs: 30_000,
+        const result = await this.callApi("/CMD_API_DOMAINS", form, {
+            timeoutMs: 20_000,
         })
 
         if (result.error) {
             return { success: false, message: result.error }
         }
 
+        if (!result.ok) {
+            return { success: false, message: `HTTP ${result.status ?? "unknown"}` }
+        }
+
+        const parsed = parseDaKeyValueBody(result.body)
+        const domains = [
+            ...(parsed["list[]"] || []),
+            ...(parsed.domains || []),
+            ...(parsed.domain || []),
+        ].map((d) => d.trim()).filter(Boolean)
+
+        return {
+            success: true,
+            message: "Fetched user domains",
+            data: Array.from(new Set(domains)),
+        }
+    }
+
+    async changeDomainUsername(oldUsername: string, newUsername: string, domain: string): Promise<{ success: boolean; message: string }> {
+        const form = new URLSearchParams()
+        form.set("action", "modify")
+        form.set("user", oldUsername)
+        form.set("newusername", newUsername)
+        form.set("domain", domain)
+
+        const result = await this.callApi("/CMD_API_MODIFY_USER", form)
+
+        if (result.error) {
+            return { success: false, message: result.error }
+        }
+
         const parsed = parseDaResponse(result.body)
+
         if (parsed.hasExplicitError) {
-            const details = [parsed.text, parsed.details].filter(Boolean).join(" ").trim()
-            return {
-                success: false,
-                message: details || `DirectAdmin error code: ${parsed.errorValue}`,
-            }
+            return { success: false, message: parsed.text || parsed.details || "Domain/username change failed" }
         }
 
-        const successHints = /error=0|success|modified|suspended|unsuspended|deleted|changed/i.test(result.body)
-        if (!result.ok && !successHints) {
-            return {
-                success: false,
-                message: `DirectAdmin returned HTTP ${result.status ?? "unknown"}`,
-            }
-        }
-
-        return { success: true, message: successMessage }
+        return { success: true, message: "Domain/username changed successfully" }
     }
 }
