@@ -11,6 +11,19 @@ const COLORS = {
     PURPLE: 0xa855f7,
 }
 
+/**
+ * Sanitize user-controlled text before inserting into Discord embed fields.
+ * Prevents @everyone/@here mention injection and newline-based embed abuse.
+ */
+function sanitizeDiscordText(value: string | null | undefined): string {
+    if (!value) return "-"
+    return value
+        .replace(/@everyone/gi, "@ everyone")
+        .replace(/@here/gi, "@ here")
+        .replace(/[\n\r]/g, " ")
+        .slice(0, 1024)
+}
+
 function isValidDiscordWebhookUrl(value: string): boolean {
     try {
         const url = new URL(value)
@@ -138,8 +151,8 @@ export async function sendDiscordNotification(
                 embed.title = "New User Registration"
                 embed.color = COLORS.INFO
                 embed.fields = [
-                    { name: "Name", value: data.name || "-", inline: true },
-                    { name: "Email", value: data.email || "-", inline: true },
+                    { name: "Name", value: sanitizeDiscordText(data.name), inline: true },
+                    { name: "Email", value: sanitizeDiscordText(data.email), inline: true },
                     { name: "User ID", value: data.id ? `#${data.id}` : "-", inline: true },
                 ]
                 break
@@ -148,10 +161,10 @@ export async function sendDiscordNotification(
                 embed.title = "New Top-up"
                 embed.color = COLORS.SUCCESS
                 embed.fields = [
-                    { name: "User", value: `${data.userName || "Unknown"} (#${data.userId || "-"})`, inline: true },
-                    { name: "Amount", value: `${data.amount || 0}`, inline: true },
-                    { name: "Method", value: data.method || "-", inline: true },
-                    { name: "Reference", value: data.reference || "-", inline: false },
+                    { name: "User", value: sanitizeDiscordText(`${data.userName || "Unknown"} (#${data.userId || "-"})`), inline: true },
+                    { name: "Amount", value: sanitizeDiscordText(`${data.amount || 0}`), inline: true },
+                    { name: "Method", value: sanitizeDiscordText(data.method), inline: true },
+                    { name: "Reference", value: sanitizeDiscordText(data.reference), inline: false },
                 ]
                 break
 
@@ -159,10 +172,10 @@ export async function sendDiscordNotification(
                 embed.title = "New Order"
                 embed.color = COLORS.SUCCESS
                 embed.fields = [
-                    { name: "User", value: `${data.userName || "Unknown"} (#${data.userId || "-"})`, inline: true },
-                    { name: "Service", value: data.packageName || "-", inline: true },
-                    { name: "Price", value: `${data.price || 0}`, inline: true },
-                    { name: "Domain", value: data.domain || "-", inline: false },
+                    { name: "User", value: sanitizeDiscordText(`${data.userName || "Unknown"} (#${data.userId || "-"})`), inline: true },
+                    { name: "Service", value: sanitizeDiscordText(data.packageName), inline: true },
+                    { name: "Price", value: sanitizeDiscordText(`${data.price || 0}`), inline: true },
+                    { name: "Domain", value: sanitizeDiscordText(data.domain), inline: false },
                 ]
                 break
 
@@ -173,24 +186,23 @@ export async function sendDiscordNotification(
                 embed.fields = [
                     { name: "Status", value: "Active", inline: true },
                     { name: "Latency", value: "<1000ms", inline: true },
-                    { name: "User", value: data.user || "Admin", inline: true },
+                    { name: "User", value: sanitizeDiscordText(data.user) || "Admin", inline: true },
                 ]
                 break
             case "directadmin":
                 embed.title = "DirectAdmin Event"
                 embed.color = data.status === "failed" ? COLORS.PURPLE : COLORS.INFO
                 embed.fields = [
-                    { name: "Action", value: data.action || "-", inline: true },
-                    { name: "Status", value: data.status || "-", inline: true },
+                    { name: "Action", value: sanitizeDiscordText(data.action), inline: true },
+                    { name: "Status", value: sanitizeDiscordText(data.status), inline: true },
                     { name: "Order ID", value: data.orderId ? `#${data.orderId}` : "-", inline: true },
-                    { name: "Message", value: data.message || "-", inline: false },
+                    { name: "Message", value: sanitizeDiscordText(data.message), inline: false },
                 ]
                 break
         }
 
         await sendWebhook(webhookUrl, { embeds: [embed] })
     } catch (error) {
-        console.error("Error sending Discord notification:", error)
-        throw error
+        console.error("Failed to send Discord notification:", error)
     }
 }
