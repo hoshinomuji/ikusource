@@ -237,7 +237,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Issues**: [GitHub Issues](https://github.com/hoshinomuji/ikusource/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/hoshinomuji/ikusource/discussions)
-- **Email**: contact@ikusource.dev
+- **Email**: mujidev@outlook.co.th
 
 ---
 
