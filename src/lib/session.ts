@@ -1,4 +1,4 @@
-﻿import { SignJWT, jwtVerify } from "jose"
+import { SignJWT, jwtVerify } from "jose"
 
 export const SESSION_COOKIE_NAME = "session"
 
@@ -11,16 +11,13 @@ type CookieSetStore = {
 }
 
 function getSessionSecret() {
-  const secret =
-    process.env.SESSION_SECRET ||
-    process.env.AUTH_SECRET ||
-    process.env.JWT_SECRET
+  const secret = process.env.SESSION_SECRET
 
   if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Missing SESSION_SECRET in production")
-    }
-    return "dev-insecure-session-secret-change-me"
+    throw new Error(
+      "SESSION_SECRET environment variable is required. " +
+      "Generate a secure random string: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    )
   }
 
   return secret
