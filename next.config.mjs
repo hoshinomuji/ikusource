@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename)
 // Force restart
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     // unoptimized: true,
