@@ -11,12 +11,14 @@ function fromB64Url(input: string) {
 }
 
 function getEncryptionKey(): Buffer {
-    const raw =
-        process.env.SECRET_ENCRYPTION_KEY ||
-        process.env.SESSION_SECRET ||
-        process.env.AUTH_SECRET ||
-        process.env.JWT_SECRET ||
-        "dev-insecure-encryption-key-change-me"
+    const raw = process.env.SECRET_ENCRYPTION_KEY
+    if (!raw) {
+        throw new Error(
+            "SECRET_ENCRYPTION_KEY environment variable is required. " +
+            "Do not fall back to SESSION_SECRET or other signing keys. " +
+            "Generate a unique key for encryption: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+        )
+    }
     return createHash("sha256").update(raw).digest()
 }
 
