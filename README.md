@@ -37,8 +37,8 @@ A modern, full-stack web hosting management platform built with cutting-edge tec
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/ikuzen-hosting.git
-cd ikuzen-hosting
+git clone https://github.com/hoshinomuji/ikusource.git
+cd ikusource
 ```
 
 ### 2. Install Dependencies
@@ -63,7 +63,7 @@ Edit `.env.local` with your configuration:
 
 ```env
 # Database
-DATABASE_URL=postgres://user:password@localhost:5432/ikuzen_db
+DATABASE_URL=postgres://user:password@localhost:5432/ikusource_db
 
 # Application
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -145,8 +145,8 @@ src/
 
 ```bash
 # Build and run with Docker
-docker build -t ikuzen-hosting .
-docker run -p 3000:3000 ikuzen-hosting
+docker build -t ikusource .
+docker run -p 3000:3000 ikusource
 ```
 
 ### Coolify Deployment
@@ -176,11 +176,11 @@ vercel
 - [x] Email notification system
 
 ### Phase 2: Advanced Features 🚧
-- [ ] Multi-tenant architecture
-- [ ] Advanced analytics and reporting
+- [x] Multi-tenant architecture
+- [x] Advanced analytics and reporting
 - [x] API rate limiting and security enhancements
-- [ ] Plugin system for extensibility
-- [ ] Migration to Elysia backend
+- [x] Plugin system for extensibility
+- [ ] Migration to Elysia backend (in progress)
 
 ### Phase 3: Enterprise Features 📋
 - [ ] White-label solutions
@@ -191,7 +191,7 @@ vercel
 
 ### Known Issues & TODOs
 - [x] **Database**: Migration scripts now validate environment variables
-- [x] **Security**: Security audit completed — CSRF bypass, Discord injection, password reset validation, insecure TLS fixed
+- [x] **Security**: Security audit completed — 15 critical vulnerabilities fixed (CSRF bypass, Discord injection, password reset validation, insecure TLS, encryption key reuse, Math.random usage, session cookie security, timing attacks, OAuth state validation, 2FA cookie security, and more)
 - [x] **Performance**: In-memory cache layer added (`src/lib/cache.ts`)
 - [ ] **Testing**: Add comprehensive test suite (unit, integration, e2e)
 
@@ -235,9 +235,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/ikuzen-hosting/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/ikuzen-hosting/discussions)
-- **Email**: support@ikuzen.com
+- **Issues**: [GitHub Issues](https://github.com/hoshinomuji/ikusource/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/hoshinomuji/ikusource/discussions)
+- **Email**: contact@ikusource.dev
 
 ---
 
