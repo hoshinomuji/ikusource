@@ -1,46 +1,45 @@
-
-type RateLimitStore = Map<string, { count: number; expiresAt: number }>;
-
-const limiters: Map<string, RateLimitStore> = new Map();
+import { db } from "@/db"
+import { rateLimitLogs } from "@/db/schema"
+import { eq, gt } from "drizzle-orm"
 
 interface RateLimitConfig {
-    uniqueTokenPerInterval?: number; // Max number of unique tokens per interval (to prevent memory leaks)
-    interval?: number; // Interval in milliseconds
-    limit?: number; // Max number of requests per interval
+    interval?: number // Interval in milliseconds
+    limit?: number // Max number of requests per interval
 }
 
 export function rateLimit(options: RateLimitConfig = {}) {
-    const interval = options.interval || 60000; // Default 1 minute
-    const limit = options.limit || 5; // Default 5 requests
-    const uniqueTokenPerInterval = options.uniqueTokenPerInterval || 500;
-
-    const storage: RateLimitStore = new Map();
+    const interval = options.interval || 60000 // Default 1 minute
+    const limit = options.limit || 5 // Default 5 requests
 
     return {
         check: async (token: string): Promise<void> => {
-            const now = Date.now();
-            const record = storage.get(token);
+            const now = new Date()
+            const windowStart = new Date(now.getTime() - interval)
 
-            // Clean up expired tokens
-            if (storage.size > uniqueTokenPerInterval) {
-                for (const [key, value] of storage.entries()) {
-                    if (value.expiresAt < now) {
-                        storage.delete(key);
-                    }
-                }
+            // Query database for recent requests
+            const recentRequests = await db
+                .select()
+                .from(rateLimitLogs)
+                .where(
+                    eq(rateLimitLogs.token, token) &&
+                    gt(rateLimitLogs.createdAt, windowStart)
+                )
+
+            if (recentRequests.length >= limit) {
+                throw new Error("Rate limit exceeded")
             }
 
-            if (record && record.expiresAt > now) {
-                if (record.count >= limit) {
-                    throw new Error("Rate limit exceeded");
-                }
-                record.count++;
-            } else {
-                storage.set(token, {
-                    count: 1,
-                    expiresAt: now + interval,
-                });
-            }
+            // Log this request
+            await db.insert(rateLimitLogs).values({
+                token,
+                createdAt: now,
+            })
+
+            // Clean up old entries (older than 24 hours)
+            const cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+            await db
+                .delete(rateLimitLogs)
+                .where(rateLimitLogs.createdAt < cutoffTime)
         },
-    };
+    }
 }

@@ -1,4 +1,4 @@
-﻿import { SignJWT, jwtVerify } from "jose"
+import { SignJWT, jwtVerify } from "jose"
 
 export const SESSION_COOKIE_NAME = "session"
 
@@ -11,16 +11,13 @@ type CookieSetStore = {
 }
 
 function getSessionSecret() {
-  const secret =
-    process.env.SESSION_SECRET ||
-    process.env.AUTH_SECRET ||
-    process.env.JWT_SECRET
+  const secret = process.env.SESSION_SECRET
 
   if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Missing SESSION_SECRET in production")
-    }
-    return "dev-insecure-session-secret-change-me"
+    throw new Error(
+      "SESSION_SECRET environment variable is required. " +
+      "Generate a secure random string: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    )
   }
 
   return secret
@@ -55,8 +52,8 @@ export async function setSessionCookie(cookieStore: CookieSetStore, userId: numb
   const token = await signSessionToken(userId)
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   })
@@ -67,22 +64,22 @@ export function clearAuthCookies(cookieStore: CookieSetStore) {
     expires: new Date(0),
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
   })
   cookieStore.set("userId", "", {
     expires: new Date(0),
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
   })
   cookieStore.set("2fa_pending_user", "", {
     expires: new Date(0),
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
   })
 }
 

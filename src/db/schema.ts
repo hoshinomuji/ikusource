@@ -75,7 +75,7 @@ export const pointTransactions = pgTable("point_transactions", {
 export const directAdminConfig = pgTable("directadmin_config", {
     id: serial("id").primaryKey(),
     resellerUsername: text("reseller_username").notNull(),
-    resellerPassword: text("reseller_password").notNull(),
+    resellerPasswordEncrypted: text("reseller_password_encrypted").notNull(),
     serverIp: text("server_ip").notNull(),
     panelUrl: text("panel_url").notNull(),
     nameserver1: text("nameserver_1").notNull(),

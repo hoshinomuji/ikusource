@@ -27,7 +27,7 @@ async function createTransporter() {
                 pass: settings.smtpPass,
             },
             tls: {
-                rejectUnauthorized: false, // Fix for self-signed certificates
+                rejectUnauthorized: true, // Fix for self-signed certificates
             },
             connectionTimeout: 60000, // 60 seconds
             greetingTimeout: 60000, // 60 seconds

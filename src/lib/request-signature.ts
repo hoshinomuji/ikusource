@@ -69,7 +69,9 @@ export function createSignedHeadersForCron(
     body = ""
 ): Record<string, string> {
     const timestamp = Date.now().toString()
-    const nonce = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+    const buffer = new Uint8Array(16)
+    crypto.getRandomValues(buffer)
+    const nonce = Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('')
     const canonical = canonicalRequest(method, path, timestamp, nonce, body)
     const signature = signCanonical(secret, canonical)
     return {

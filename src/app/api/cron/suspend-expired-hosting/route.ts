@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
         if (expectedSecret) {
             const authHeader = request.headers.get("authorization")
             const token = authHeader?.replace("Bearer ", "").trim()
-            const hasBearer = Boolean(token && token === expectedSecret)
+            
+            // Use constant-time comparison to prevent timing attacks
+            const hasBearer = token && await constantTimeCompare(token, expectedSecret)
 
             if (!hasBearer) {
                 const verified = await verifySignedRequest(request, expectedSecret)
@@ -100,5 +102,21 @@ export async function GET(request: NextRequest) {
 // Also support POST for flexibility
 export async function POST(request: NextRequest) {
     return GET(request)
+}
+
+async function constantTimeCompare(a: string, b: string): Promise<boolean> {
+    const aBuffer = new TextEncoder().encode(a)
+    const bBuffer = new TextEncoder().encode(b)
+    
+    if (aBuffer.length !== bBuffer.length) {
+        return false
+    }
+    
+    let result = 0
+    for (let i = 0; i < aBuffer.length; i++) {
+        result |= aBuffer[i] ^ bBuffer[i]
+    }
+    
+    return result === 0
 }
 
