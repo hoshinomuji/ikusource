@@ -52,8 +52,8 @@ export async function setSessionCookie(cookieStore: CookieSetStore, userId: numb
   const token = await signSessionToken(userId)
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   })
@@ -64,22 +64,22 @@ export function clearAuthCookies(cookieStore: CookieSetStore) {
     expires: new Date(0),
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
   })
   cookieStore.set("userId", "", {
     expires: new Date(0),
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
   })
   cookieStore.set("2fa_pending_user", "", {
     expires: new Date(0),
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
   })
 }
 

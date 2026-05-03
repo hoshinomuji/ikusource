@@ -8,6 +8,23 @@ import { getOAuthSettings } from "@/app/actions/settings"
 import { setSessionCookie } from "@/lib/session"
 import { getSafeAppBaseUrl } from "@/lib/app-url"
 
+// Constant-time string comparison to prevent timing attacks
+async function constantTimeCompare(a: string, b: string): Promise<boolean> {
+    const aBuffer = new TextEncoder().encode(a)
+    const bBuffer = new TextEncoder().encode(b)
+    
+    if (aBuffer.length !== bBuffer.length) {
+        return false
+    }
+    
+    let result = 0
+    for (let i = 0; i < aBuffer.length; i++) {
+        result |= aBuffer[i] ^ bBuffer[i]
+    }
+    
+    return result === 0
+}
+
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get("code")
@@ -15,16 +32,30 @@ export async function GET(request: NextRequest) {
     const returnedState = searchParams.get("state")
     const cookieStore = await cookies()
     const expectedState = cookieStore.get("oauth_google_state")?.value
+    const stateExpiry = cookieStore.get("oauth_google_state_expiry")?.value
 
     if (error) {
         return redirect("/login?error=oauth_cancelled")
     }
 
-    if (!returnedState || !expectedState || returnedState !== expectedState) {
-        return redirect("/login?error=oauth_error&details=google_state")
+    // Validate state parameter (CSRF protection)
+    if (!returnedState || !expectedState) {
+        return redirect("/login?error=oauth_error&details=missing_state")
+    }
+
+    // Validate state expiry (5 minutes)
+    if (!stateExpiry || Date.now() > parseInt(stateExpiry)) {
+        return redirect("/login?error=oauth_error&details=state_expired")
+    }
+
+    // Use constant-time comparison to prevent timing attacks
+    const stateMatch = await constantTimeCompare(returnedState, expectedState)
+    if (!stateMatch) {
+        return redirect("/login?error=oauth_error&details=invalid_state")
     }
 
     cookieStore.delete("oauth_google_state")
+    cookieStore.delete("oauth_google_state_expiry")
 
     if (!code) {
         return redirect("/login?error=oauth_failed")
@@ -231,4 +262,3 @@ export async function GET(request: NextRequest) {
         return redirect(`/login?error=${errorType}&details=google&message=${encodeURIComponent(errorMessage)}`)
     }
 }
-

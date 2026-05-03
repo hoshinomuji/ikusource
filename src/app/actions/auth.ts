@@ -78,9 +78,9 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
             const expires = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes validity for 2FA step
                 ; (await cookies()).set("2fa_pending_user", user.id.toString(), {
                     httpOnly: true,
-                    secure: process.env.NODE_ENV === "production",
+                    secure: true,
                     expires,
-                    sameSite: "lax",
+                    sameSite: "strict",
                     path: "/",
                 })
 

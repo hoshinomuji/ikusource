@@ -478,8 +478,10 @@ export async function generateOneClickLoginByServiceId(serviceId: number) {
 
 function randomPassword(length = 16) {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    const buffer = new Uint8Array(length)
+    crypto.getRandomValues(buffer)
     let out = ""
-    for (let i = 0; i < length; i++) out += chars[Math.floor(Math.random() * chars.length)]
+    for (let i = 0; i < length; i++) out += chars[buffer[i] % chars.length]
     return out
 }
 

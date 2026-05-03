@@ -70,8 +70,10 @@ function generateUsername(domain: string, userId: number): string {
     
     // Generate 2 random characters for uniqueness
     const randomChars = "abcdefghijklmnopqrstuvwxyz0123456789"
-    const r1 = randomChars.charAt(Math.floor(Math.random() * randomChars.length))
-    const r2 = randomChars.charAt(Math.floor(Math.random() * randomChars.length))
+    const buffer = new Uint8Array(2)
+    crypto.getRandomValues(buffer)
+    const r1 = randomChars.charAt(buffer[0] % randomChars.length)
+    const r2 = randomChars.charAt(buffer[1] % randomChars.length)
     const suffix = `${r1}${r2}`
 
     // Calculate available space for domain prefix
@@ -106,9 +108,11 @@ function generateUsername(domain: string, userId: number): string {
 function generatePassword(): string {
     const length = 16
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    const buffer = new Uint8Array(length)
+    crypto.getRandomValues(buffer)
     let password = ""
     for (let i = 0; i < length; i++) {
-        password += charset.charAt(Math.floor(Math.random() * charset.length))
+        password += charset.charAt(buffer[i] % charset.length)
     }
     return password
 }
